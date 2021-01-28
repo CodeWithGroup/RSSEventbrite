@@ -16,8 +16,6 @@ organisationId = "464103861019"
 
 monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 eventTemplate = "<div class=\"row card\"><div class=\"col-12`eventClass`\"><div class=\"row\"><div class=\"col-sm-4 col-lg-2 event-date\"><span class=\"event-date-month\">`month`</span> <span class=\"event-date-day\">`day`</span><p><span class=\"event-date-start-time\">`eventStart``eventStartAmPm` - </span><span class=\"event-date-end-time\">`eventEnd``eventEndAmPm`</span></p></div><div class=\"col-sm-8 col-lg-10 event-title\"><span class=\"event-title\">`eventName`</span></div></div><div class=\"row\"><div class=\"col-md-12 col-lg-9 event-description\"><span class=\"event-description\">`eventDescription`</span></div><div class=\"col-md-12 col-lg-3 event-book-button\"><!-- Noscript content for added SEO --><noscript><a href=\"https://www.eventbrite.co.uk/e/programming-101-tickets-`eventId`\"rel=\"noopener noreferrer\" target=\"_blank\"></noscript><!-- You can customize this button any way you like --><button id=\"`eventbriteWidgetModalTriggerEventId`\" class=\"btn `registerButtonClass` float-right\"type=\"button\">`registerButtonText`</button><noscript></a>Register for tickets on Eventbrite</noscript></div></div></div></div>"
-widgetPrefix = "var orderComplete = function () {var resultString = \"Order complete!\";alert(resultString);console.log(resultString);};"
-widgetTemplate = "/* `eventName` */ window.EBWidgets.createWidget({widgetType: 'checkout',eventId: '`eventId`',modal: true,modalTriggerElementId: '`eventbriteWidgetModalTriggerEventId`',onOrderComplete: orderComplete});"
 
 async def fetchEventTicketClasses(session, eventId):
     url = eventBriteApiUrl + "events/" + str(eventId) + "/ticket_classes/"
@@ -61,7 +59,7 @@ def getEventsAsHtml(event, lambda_context):
     huddles = ""
     workshops = ""
     
-    widgets = widgetPrefix
+    widgets = ""
 
     eventData = getOrganisationEvents(organisationId)
     ticketClassData = asyncio.run(getEventTicketClasses(eventData))
@@ -117,11 +115,6 @@ def getEventsAsHtml(event, lambda_context):
             .replace("`eventEndAmPm`", eventEndAmPm) \
             .replace("`eventName`", eventName) \
             .replace("`eventDescription`", eventDescription) \
-            .replace("`eventId`", eventId) \
-            .replace("`eventbriteWidgetModalTriggerEventId`", "eventbrite-widget-modal-trigger-" + eventId)
-
-        widgets += "\r\n" + widgetTemplate \
-            .replace("`eventName`", eventName) \
             .replace("`eventId`", eventId) \
             .replace("`eventbriteWidgetModalTriggerEventId`", "eventbrite-widget-modal-trigger-" + eventId)
 
