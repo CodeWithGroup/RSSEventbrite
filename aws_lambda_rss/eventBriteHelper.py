@@ -14,20 +14,27 @@ headers = {
 eventBriteApiUrl = "https://www.eventbriteapi.com/v3/"
 organisationId = "464103861019"
 
-monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-eventTemplate = "<div class=\"row card\"><div class=\"col-12`eventClass`\"><div class=\"row\"><div class=\"col-sm-4 col-lg-2 event-date\"><span class=\"event-date-month\">`month`</span> <span class=\"event-date-day\">`day`</span><p><span class=\"event-date-start-time\">`eventStart``eventStartAmPm` - </span><span class=\"event-date-end-time\">`eventEnd``eventEndAmPm`</span></p></div><div class=\"col-sm-8 col-lg-10 event-title\"><span class=\"event-title\">`eventName`</span></div></div><div class=\"row\"><div class=\"col-md-12 col-lg-9 event-description\"><span class=\"event-description\">`eventDescription`</span></div><div class=\"col-md-12 col-lg-3 event-book-button\"><!-- Noscript content for added SEO --><noscript><a href=\"https://www.eventbrite.co.uk/e/programming-101-tickets-`eventId`\"rel=\"noopener noreferrer\" target=\"_blank\"></noscript><!-- You can customize this button any way you like --><button id=\"`eventbriteWidgetModalTriggerEventId`\" class=\"btn `registerButtonClass` float-right\"type=\"button\">`registerButtonText`</button><noscript></a>Register for tickets on Eventbrite</noscript></div></div></div></div>"
+monthNames = ["January", "February", "March", "April", "May", "June",
+              "July", "August", "September", "October", "November", "December"]
+preevent = "<rss version=\"2.0\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\" xmlns:atom=\"http://www.w3.org/2005/Atom\"><channel>"
+eventTemplate = ""
+postevent = "</channel></rss>"
+
 
 async def fetchEventTicketClasses(session, eventId):
     url = eventBriteApiUrl + "events/" + str(eventId) + "/ticket_classes/"
-    async with session.get(url = url, headers = headers) as response:
+    async with session.get(url=url, headers=headers) as response:
         responseJson = await response.json()
         return {'eventId': eventId, 'response': responseJson}
 
+
 def getOrganisationEvents(organisationId):
-    eventsUrl = eventBriteApiUrl + "organizations/" + str(organisationId) + "/events/"
-    response = session.get(url = eventsUrl, headers = headers)
+    eventsUrl = eventBriteApiUrl + "organizations/" + \
+        str(organisationId) + "/events/"
+    response = session.get(url=eventsUrl, headers=headers)
     return json.loads(response.text)['events']
-    
+
+
 async def getEventTicketClasses(eventData):
     async with ClientSession() as session:
         asyncTasks = []
@@ -42,37 +49,41 @@ async def getEventTicketClasses(eventData):
                 continue
 
             ticketClassData[response['eventId']] = response['response']
-        
+
         return ticketClassData
+
 
 def processOrganisationEventsResponse(response):
     global organisationEvents
     organisationEvents = json.loads(response.text)
 
+
 def processEventTicketClassesResponse(response):
     global ticketClasses
     ticketClasses = json.loads(response.text)['ticket_classes']
+
 
 def getEventsAsHtml(event, lambda_context):
     content = ""
     dropins = ""
     huddles = ""
     workshops = ""
-    
+
     widgets = ""
 
     eventData = getOrganisationEvents(organisationId)
     ticketClassData = asyncio.run(getEventTicketClasses(eventData))
 
     for event in eventData:
+
         if event['status'] != "live":
             continue
-        
+
         eventId = event['id']
 
         ticketClasses = ticketClassData[eventId]['ticket_classes']
         onSaleStatus = '' if ticketClasses == [] else ticketClasses[0]['on_sale_status']
-        
+
         eventClass = ''
         registerButtonClass = 'btn-primary'
         registerButtonText = 'Register'
@@ -80,8 +91,9 @@ def getEventsAsHtml(event, lambda_context):
             eventClass = ' event-sold-out'
             registerButtonClass = 'btn-default'
             registerButtonText = 'Sold out'
-        
-        startDate = datetime.strptime(event['start']['local'], "%Y-%m-%dT%H:%M:%S")
+
+        startDate = datetime.strptime(
+            event['start']['local'], "%Y-%m-%dT%H:%M:%S")
         endDate = datetime.strptime(event['end']['local'], "%Y-%m-%dT%H:%M:%S")
 
         month = monthNames[startDate.month - 1][:3].upper()
@@ -102,11 +114,9 @@ def getEventsAsHtml(event, lambda_context):
             eventEnd -= 12
             eventEndAmPm = "pm"
 
+        url = event["url"]
+
         eventHtml = eventTemplate \
-            .replace("`eventClass`", eventClass) \
-            .replace("`registerButtonClass`", registerButtonClass) \
-            .replace("`registerButtonText`", registerButtonText) \
-            .replace("`eventClass`", eventClass) \
             .replace("`month`", month) \
             .replace("`day`", str(day)) \
             .replace("`eventStart`", str(eventStart)) \
@@ -116,24 +126,13 @@ def getEventsAsHtml(event, lambda_context):
             .replace("`eventName`", eventName) \
             .replace("`eventDescription`", eventDescription) \
             .replace("`eventId`", eventId) \
-            .replace("`eventbriteWidgetModalTriggerEventId`", "eventbrite-widget-modal-trigger-" + eventId)
+            .replace("`url`", url) \
 
         content += eventHtml
-        
-        if 'drop' in eventName.lower() and 'in' in eventName.lower():
-            dropins += eventHtml
-        elif 'huddle' in eventName.lower():
-            huddles += eventHtml
-        else:
-            workshops += eventHtml
 
-    if dropins == "":
-        dropins = "<p>We don't have any drop-ins scheduled at the moment. Ask on Slack if you'd like us to arrange one.</p>"
+    if content == "":
+        content = "<p>We don't have any events scheduled at the moment. Ask on Slack if you'd like us to arrange one.</p>"
 
-    if huddles == "":
-        huddles = "<p>We don't have any huddles scheduled at the moment. Ask on Slack if you'd like us to arrange one.</p>"
+    content = preevent + content + postevent
 
-    if workshops == "":
-        workshops = "<p>We don't have any workshops planned at the moment. Ask on Slack if you'd like us to arrange one.</p>"
-
-    return {'statusCode': 200, 'content': content, 'dropins': dropins, 'huddles': huddles, 'workshops': workshops, 'widgets': widgets}
+    return {'statusCode': 200, 'content': content}
