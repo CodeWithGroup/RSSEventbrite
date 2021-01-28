@@ -135,4 +135,4 @@ def getEventsAsHtml(event, lambda_context):
 
     content = preevent + content + postevent
 
-    return {'statusCode': 200, 'content': content}
+    return content
